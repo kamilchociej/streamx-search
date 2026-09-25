@@ -1,0 +1,131 @@
+---
+default:
+  environment:
+    STREAMX_BLUEPRINTS_KEY_VALUE_STATE_REPOSITORY_BACKEND: "rocksdb"
+    STREAMX_BLUEPRINTS_KEY_VALUE_STATE_REPOSITORY_ROCKSDB_PATH: "/var/lib/rocksdb"
+descriptors:
+  indexable-resources-producer:
+    type: "processing"
+    containers:
+      processor:
+        image: "ghcr.io/streamx-hub/streamx-blueprints/indexable-resources-producer:3.0.27-native"
+        incoming:
+          pages: {}
+          fragments: {}
+        outgoing:
+          indexable-resources: {}
+          indexable-resource-fragments: {}
+
+  opensearch-sink:
+    type: edge
+    volumes:
+      opensearch-data:
+        size: 20Gi
+        persistent: true
+      rocksdb:
+        size: 20Gi
+        persistent: true
+    containers:
+      sink:
+        image: ghcr.io/streamx-hub/streamx-blueprints/opensearch-sink:3.0.27-native
+        incoming:
+          indexable-resources:
+            initState: delta
+          indexable-resource-fragments:
+            initState: delta
+        servicePorts:
+          - 8082:8080
+        volumes:
+          - opensearch-data:/usr/share/opensearch/data
+          - rocksdb:/var/lib/rocksdb
+        environment:
+          QUARKUS_ELASTICSEARCH_HOSTS: ${STREAMX_SERVICE_ID}.opensearch:9201
+      opensearch:
+        image: registry.prod-ext.streamx.cloud/streamx-docker-hub-public-proxy/opensearchproject/opensearch:2.16.0
+        servicePorts:
+          - 9201:9201
+        volumes:
+          - opensearch-data:/usr/share/opensearch/data
+        environment:
+          network.host: 0.0.0.0
+          http.port: "9201"
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+
+ingestion:
+  rest-ingestion:
+    containers:
+      proxy:
+        environment:
+          STREAMX_SOURCES_PAGES_ACCEPT_IAT_FROM: "1704067200"
+sources:
+  pages:
+    outgoing:
+    - ref: "inbox.pages"
+      produces:
+      - "com.streamx.blueprints.page.published.v1"
+      - "com.streamx.blueprints.page.unpublished.v1"
+
+processing:
+  indexable-resources-producer:
+    descriptor: "indexable-resources-producer"
+    containers:
+      processor:
+        incoming:
+          pages:
+            ref: "inbox.pages"
+          fragments:
+            ref: "relay.fragments"
+        outgoing:
+          indexable-resources:
+            ref: "outbox.indexable-resources"
+          indexable-resource-fragments:
+            ref: "outbox.indexable-resource-fragments"
+        environment:
+          QUARKUS_CONFIG_LOCATIONS: "/deployments/config/application.yaml"
+        volumesFrom:
+          configs:
+          - "indexable-resources-producer.yaml:/deployments/config/application.yaml"
+
+edge:
+  opensearch-sink:
+    descriptor: "opensearch-sink"
+    containers:
+      sink:
+        incoming:
+          indexable-resources:
+            ref: "outbox.indexable-resources"
+          indexable-resource-fragments:
+            ref: "outbox.indexable-resource-fragments"
+        environmentFrom:
+          secrets:
+          - "encrypted/opensearch-sink.properties"
+        volumesFrom:
+          configs:
+          - "opensearch/service-init:/deployments/opensearch/service-init/additional"
+      opensearch:
+        environmentFrom:
+          secrets:
+          - "encrypted/opensearch-sink-opensearch.properties"
+
+networking:
+  httpRoutes:
+    ingestion-route:
+      rules:
+      - backendRefs:
+        - name: "ingestion/rest-ingestion"
+          port: 8080
+        matches:
+        - path:
+            type: "PathPrefix"
+            value: "/"
+    web-server-and-search-route:
+      rules:
+      - backendRefs:
+        - name: "edge/opensearch-sink"
+          port: 8082
+        matches:
+        - path:
+            type: "PathPrefix"
+            value: "/search"
+

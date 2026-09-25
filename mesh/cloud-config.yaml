@@ -1,0 +1,14 @@
+---
+global:
+  services:
+    edge:
+      opensearch-sink:
+        replicas: 2
+        stateful: true
+clusters:
+  eu-west-par-edge:
+    enabled: true
+    overlay: {}
+  eu-west-par-processing:
+    enabled: true
+    overlay: {}
