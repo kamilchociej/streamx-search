@@ -12,6 +12,9 @@ clusters:
   eu-west-par-edge:
     enabled: true
     overlay: {}
+  ap-southeast-sin-edge:
+    enabled: true
+    overlay: {}
   eu-west-par-processing:
     enabled: true
     overlay: {}
