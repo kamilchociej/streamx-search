@@ -24,6 +24,8 @@ streamx:
                 - name: removeStart
                   config: "facets:"
               value-processors:
+                - name: split
+                  config: ","
                 - name: trim
 
             description:
