@@ -9,9 +9,6 @@ clusters:
   ca-east-bhs-edge:
     enabled: true
     overlay: {}
-  eu-south-mil-edge:
-    enabled: true
-    overlay: {}
   ap-southeast-sin-edge:
     enabled: true
     overlay: {}
