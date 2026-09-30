@@ -15,6 +15,9 @@ clusters:
   ap-southeast-sin-edge:
     enabled: true
     overlay: {}
+  eu-central-waw-edge:
+    enabled: true
+    overlay: {}
   eu-west-par-processing:
     enabled: true
     overlay: {}
